@@ -148,7 +148,6 @@ Arguments:
 
 if __name__ == '__main__':
     args = docopt(docstr)
-    print(args)
 
     if args['conv-reuse']:
         tile = get_dims(args['<tile-dims>'])
