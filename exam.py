@@ -1,11 +1,20 @@
 #!/usr/bin/python3
 from docopt import docopt
-from sys import argv
+from sys import argv, stderr
+from functools import reduce
 
 
-def conv_reuse(tw: int, mw: int, dim: int):
-    return {'Average Data Reuse for internal node':
-            (tw*mw)**dim / (tw+mw-1)**dim}
+def conv_reuse(tile, mask):
+    dim = len(tile)
+    assert(dim == len(mask))
+    nom = reduce(lambda x, y: x*y,
+                 map(lambda x: x[0]*x[1], zip(tile, mask)),
+                 1)
+    denom = reduce(lambda x, y: x*y,
+                   map(lambda x: x[0]+x[1]-1, zip(tile, mask)),
+                   1)
+
+    return {'Average Data Reuse for internal node': nom/denom}
 
 
 def threeDit(tup):
@@ -113,11 +122,28 @@ def print_results(res):
         print(f"{key}: {val}")
 
 
+def get_dims(csl: str):
+    strlst = csl.split(',')
+    return list(map(lambda s: int(s), strlst))
+
+
 docstr = f'''Exam Calculator
 usage:
-    {argv[0]} conv-reuse <tile-width> <mask-width> <dim>
+    {argv[0]} conv-reuse <tile-dims> <mask-dims>
     {argv[0]} warp-divergence <block-x> <block-y> <block-z>
                               <img-x> <img-y> <img-z> <warp-sz>
+    {argv[0]} (-h | --help)
+
+Commands:
+    conv-reuse      Calculate the average reuse of an internal tile
+    warp-divergence Produce a list of divergent warps
+
+Options:
+    -h --help       Show this screen
+
+Arguments:
+    tile-dims       comma-seperated list of dimension sizes (i.e., "16,16,8")
+    mask-dims       comma-seperated list of dimension sizes (i.e., "16,16,8")
 '''
 
 if __name__ == '__main__':
@@ -125,9 +151,16 @@ if __name__ == '__main__':
     print(args)
 
     if args['conv-reuse']:
-        res = conv_reuse(int(args['<tile-width>']),
-                         int(args['<mask-width>']),
-                         int(args['<dim>']))
+        tile = get_dims(args['<tile-dims>'])
+        mask = get_dims(args['<mask-dims>'])
+        if len(tile) != len(mask):
+            print("<mask-dims> and <tile-dims> must be same dimension",
+                  file=stderr)
+            exit(1)
+        if len(tile) == 0:
+            print("<tile-dim> must be non-zero dimension", file=stderr)
+            exit(1)
+        res = conv_reuse(tile, mask)
     elif args['warp-divergence']:
         if args['<img-z>'] is None:
             res = warp_divergence2d(int(args['<block-x>']),
