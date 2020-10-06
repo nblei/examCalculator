@@ -45,6 +45,11 @@ def warp_divergence3d(blockDim, imgDim, warpsize):
     divcnt: int = 0
     counted: bool = False
 
+    def block_num(blockTup):
+        bx, by, bz = blockTup
+        dx, dy, _ = gridDim
+        return bz * (dx*dy) + by * dx + bx
+
     def is_inbounds(tidx, bidx):
         _x = bidx[0] * blockDim[0] + tidx[0]
         _y = bidx[1] * blockDim[1] + tidx[1]
@@ -58,7 +63,10 @@ def warp_divergence3d(blockDim, imgDim, warpsize):
 
     predicate = block_skip
 
-    divergent_warps = []
+    nblocks = reduce(lambda a, b: a * b, gridDim, 1)
+    divergent_warps = {x: [] for x in range(nblocks)}
+    del nblocks
+
     for bidx in threeDit(gridDim):
         for tidx in threeDit(blockDim):
             # print(img_idx, img_idy)
@@ -72,11 +80,20 @@ def warp_divergence3d(blockDim, imgDim, warpsize):
                     if divergence is True and counted is False:
                         divcnt += 1
                         counted = True
-                        divergent_warps.append(warp // warpsize)
+                        bnum = block_num(bidx)
+                        divergent_warps[bnum].append(warp // warpsize)
             warp += 1
 
+    def pretty_print(item):
+        key = item[0]
+        val = item[1]
+        if len(val) == 0:
+            return ''
+        return f'{key}: {len(val)} --- {val}\n'
+
+    pretty = '\n' + ''.join(map(pretty_print, divergent_warps.items()))
     return {'Number of Divergent Warps': divcnt,
-            'Divergent Warps': divergent_warps}
+            'Divergent Warps': pretty}
 
 
 def warp_divergence2d(bx: int, by: int, ix: int, iy: int, ws: int):
@@ -117,9 +134,12 @@ def warp_divergence2d(bx: int, by: int, ix: int, iy: int, ws: int):
             'Divergent Warps': divergent_warps}
 
 
-def print_results(res):
+def print_results(res, tab=0):
+    t = tab * '\t'
     for key, val in res.items():
-        print(f"{key}: {val}")
+        if isinstance(val, type({})):
+            print_results(val, tab=tab+1)
+        print(f"{t}{key}: {val}")
 
 
 def get_dims(csl: str):
