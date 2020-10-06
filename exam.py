@@ -64,7 +64,7 @@ def warp_divergence3d(blockDim, imgDim, warpsize):
     predicate = block_skip
 
     nblocks = reduce(lambda a, b: a * b, gridDim, 1)
-    divergent_warps = {x: [] for x in range(nblocks)}
+    divergent_warps = {x: [] for x in threeDit(gridDim)}
     del nblocks
 
     for bidx in threeDit(gridDim):
@@ -80,16 +80,16 @@ def warp_divergence3d(blockDim, imgDim, warpsize):
                     if divergence is True and counted is False:
                         divcnt += 1
                         counted = True
-                        bnum = block_num(bidx)
-                        divergent_warps[bnum].append(warp // warpsize)
+                        divergent_warps[bidx].append(warp // warpsize)
             warp += 1
 
     def pretty_print(item):
         key = item[0]
         val = item[1]
+        bnum = block_num(key)
         if len(val) == 0:
             return ''
-        return f'{key}: {len(val)} --- {val}\n'
+        return f'{key} ({bnum}): {len(val)} --- {val}\n'
 
     pretty = '\n' + ''.join(map(pretty_print, divergent_warps.items()))
     return {'Number of Divergent Warps': divcnt,
